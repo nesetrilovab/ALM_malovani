@@ -19,7 +19,7 @@ public class DottedRasterizer extends TrivialRasterizer {
         Raster raster = super.raster; // přístup k rastru z TrivialRasterizer
         Color color = super.defaultColor;
 
-        int counter = 0; // čítač pro tečky
+        int counter = 0; // counter pro tečky
 
         // Svislá čára
         if (p1.getX() == p2.getX()) {
