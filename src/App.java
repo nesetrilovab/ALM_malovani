@@ -1,202 +1,135 @@
-import models.Line;
-import models.LineCanvas;
-import models.Point;
-import rasterizers.CanvasRasterizer;
-import rasterizers.DottedRasterizer;
-import rasterizers.Rasterizer;
-import rasterizers.TrivialRasterizer;
-import rasters.Raster;
-import rasters.RasterBufferedImage;
-
 import javax.swing.*;
 import java.awt.*;
-import java.awt.event.KeyAdapter;
-import java.awt.event.KeyEvent;
-import java.awt.event.MouseAdapter;
-import java.awt.event.MouseEvent;
-import java.io.Serial;
+import java.awt.event.ActionEvent;
+import models.*;
 
 public class App {
 
-    private final JPanel panel;
-    private final Raster raster;
-
-    private Rasterizer normalRasterizer;
-    private Rasterizer dottedRasterizer;
-    private CanvasRasterizer canvasRasterizer;
-
-    private MouseAdapter mouseAdapter;
-    private KeyAdapter keyAdapter;
-
-    private Point pPomocny;
-    private LineCanvas lineCanvas;
-
-    private boolean dottedMode = false;
-    private boolean shiftMode = false; // nové pro zarovnání
-
-    public static void main(String[] args) {
-        SwingUtilities.invokeLater(() -> new App(800, 600).start());
-    }
-
-    public void clear(int color) {
-        raster.setClearColor(color);
-        raster.clear();
-    }
-
-    public void present(Graphics graphics) {
-        raster.repaint(graphics);
-    }
-
-    public void start() {
-        clear(0xaaaaaa);
-        panel.repaint();
-    }
+    private final JFrame frame;           // Hlavní okno aplikace
+    private final CanvasPanel canvas;     // kreslicí plocha
+    private final CanvasController controller; // Ovladač
 
     public App(int width, int height) {
-        JFrame frame = new JFrame();
-
-        frame.setLayout(new BorderLayout());
-        frame.setTitle("Delta : " + this.getClass().getName());
-        frame.setResizable(true);
+        frame = new JFrame("Paint App");
         frame.setDefaultCloseOperation(WindowConstants.EXIT_ON_CLOSE);
 
-        // RASTER
-        raster = new RasterBufferedImage(width, height);
+        canvas = new CanvasPanel(width, height);
+        controller = new CanvasController(canvas);
 
-        // RASTERIZERY
-        normalRasterizer = new TrivialRasterizer(raster, Color.GREEN);
-        dottedRasterizer = new DottedRasterizer(raster, Color.GREEN);
-        canvasRasterizer = new CanvasRasterizer(normalRasterizer, dottedRasterizer);
+        // posluchače pro ovládání kreslení a manipulaci s tvary
+        canvas.addMouseListener(controller.createMouseAdapter());
+        canvas.addMouseMotionListener(controller.createMouseAdapter());
+        canvas.addKeyListener(controller.createKeyAdapter());
 
-        // CANVAS
-        lineCanvas = new LineCanvas();
-
-        panel = new JPanel() {
-            @Serial
-            private static final long serialVersionUID = 1L;
-
-            @Override
-            protected void paintComponent(Graphics g) {
-                super.paintComponent(g);
-                present(g);
-            }
-        };
-
-        panel.setPreferredSize(new Dimension(width, height));
-        frame.add(panel, BorderLayout.CENTER);
-
-        createAdapters();
-
-        panel.addMouseListener(mouseAdapter);
-        panel.addMouseMotionListener(mouseAdapter);
-        panel.addKeyListener(keyAdapter);
+        frame.setLayout(new BorderLayout());
+        frame.add(createToolbar(), BorderLayout.NORTH); // Lišta nahoru
+        frame.add(canvas, BorderLayout.CENTER);         // Plátno doprostřed
 
         frame.pack();
         frame.setVisible(true);
-
-        panel.requestFocusInWindow();
     }
 
+    //Toolbar
+    private JToolBar createToolbar() {
+        JToolBar toolbar = new JToolBar();
+        toolbar.setFloatable(false);
 
-    private Point snapTo45Degrees(Point start, Point end) {
-        double dx = end.getX() - start.getX();
-        double dy = end.getY() - start.getY();
+        //Výběr tvarů
+        String[] shapes = {"Line", "Polygon", "Rectangle", "Ellipse"};
+        JComboBox<String> shapeBox = new JComboBox<>(shapes);
+        shapeBox.addActionListener(e -> {
+            String sel = (String) shapeBox.getSelectedItem();
+            if (sel == null) return;
+            switch (sel) {
+                case "Line" -> canvas.setMode(CanvasPanel.Mode.LINE);
+                case "Polygon" -> canvas.setMode(CanvasPanel.Mode.POLYGON);
+                case "Rectangle" -> canvas.setMode(CanvasPanel.Mode.RECTANGLE);
+                case "Ellipse" -> canvas.setMode(CanvasPanel.Mode.ELLIPSE);
+            }
+            canvas.requestFocusInWindow(); // Vrátí focus plátnu pro klávesové zkratky
+        });
+        toolbar.add(new JLabel(" Shape: "));
+        toolbar.add(shapeBox);
 
-        double angle = Math.atan2(dy, dx); // aktuální úhel
-        double deg = Math.toDegrees(angle);
+        toolbar.addSeparator();
 
-        // zaokrouhlení na nejbližší násobek 45
-        double snappedDeg = Math.round(deg / 45.0) * 45;
+        //Výběr stylu čáry
+        String[] styles = {"Solid", "Dotted", "Dashed"};
+        JComboBox<String> styleBox = new JComboBox<>(styles);
+        styleBox.addActionListener(e -> {
+            String sel = (String) styleBox.getSelectedItem();
+            if (sel == null) return;
+            switch (sel) {
+                case "Solid" -> canvas.setLineStyle(LineStyle.SOLID);
+                case "Dotted" -> canvas.setLineStyle(LineStyle.DOTTED);
+                case "Dashed" -> canvas.setLineStyle(LineStyle.DASHED);
+            }
+            canvas.requestFocusInWindow();
+        });
+        toolbar.add(new JLabel(" Style: "));
+        toolbar.add(styleBox);
 
-        // zpět na radiány
-        double snappedRad = Math.toRadians(snappedDeg);
+        toolbar.addSeparator();
 
-        double length = Math.hypot(dx, dy);
+        //Nastavení tloušťky čáry
+        JSlider thicknessSlider = new JSlider(JSlider.HORIZONTAL, 1, 4, 1);
+        thicknessSlider.setMajorTickSpacing(1);
+        thicknessSlider.setPaintTicks(true);
+        thicknessSlider.setPaintLabels(true); // Zobrazí čísla 1, 2, 3, 4
+        thicknessSlider.setPreferredSize(new Dimension(100, 45));
 
-        int newX = start.getX() + (int)Math.round(length * Math.cos(snappedRad));
-        int newY = start.getY() + (int)Math.round(length * Math.sin(snappedRad));
+        thicknessSlider.addChangeListener(e -> {
+            if (!thicknessSlider.getValueIsAdjusting()) {
+                canvas.setCurrentThickness(thicknessSlider.getValue());
+                canvas.requestFocusInWindow();
+            }
+        });
+        toolbar.add(new JLabel(" Thickness: "));
+        toolbar.add(thicknessSlider);
 
-        return new Point(newX, newY);
+        toolbar.addSeparator();
+
+        //Tlačítko pro výběr barvy
+        JButton colorBtn = new JButton("Color");
+        colorBtn.addActionListener(e -> {
+            Color selected = JColorChooser.showDialog(frame, "Select Color", canvas.getCurrentColor());
+            if (selected != null) {
+                canvas.setCurrentColor(selected);
+            }
+            canvas.requestFocusInWindow();
+        });
+        toolbar.add(colorBtn);
+
+        toolbar.addSeparator();
+
+        //Speciální módy
+        JButton selectBtn = new JButton("Select");
+        selectBtn.addActionListener(e -> { canvas.setMode(CanvasPanel.Mode.SELECT); canvas.requestFocusInWindow(); });
+        toolbar.add(selectBtn);
+
+        JButton eraseBtn = new JButton("Erase");
+        eraseBtn.addActionListener(e -> { canvas.setMode(CanvasPanel.Mode.ERASE); canvas.requestFocusInWindow(); });
+        toolbar.add(eraseBtn);
+
+        JButton fillBtn = new JButton("Fill");
+        fillBtn.addActionListener(e -> { canvas.setMode(CanvasPanel.Mode.FILL); canvas.requestFocusInWindow(); });
+        toolbar.add(fillBtn);
+
+        toolbar.add(Box.createHorizontalGlue()); // Zarovná Clear tlačítko vpravo
+
+        //Vymazání celého plátna
+        JButton clearBtn = new JButton("Clear Canvas");
+        clearBtn.setBackground(new Color(255, 200, 200));
+        clearBtn.addActionListener(e -> {
+            canvas.clearCanvas();
+            canvas.requestFocusInWindow();
+        });
+        toolbar.add(clearBtn);
+
+        return toolbar;
     }
 
-
-    private void createAdapters() {
-        mouseAdapter = new MouseAdapter() {
-
-            @Override
-            public void mousePressed(MouseEvent e) {
-                pPomocny = new Point(e.getX(), e.getY());
-            }
-
-            @Override
-            public void mouseReleased(MouseEvent e) {
-                Point p2 = new Point(e.getX(), e.getY());
-
-                if (shiftMode) { // snap při uvolnění
-                    p2 = snapTo45Degrees(pPomocny, p2);
-                }
-
-                Line line = new Line(pPomocny, p2, dottedMode);
-
-                raster.clear();
-                lineCanvas.addLine(line);
-                canvasRasterizer.rasterize(lineCanvas);
-
-                panel.repaint();
-            }
-
-            @Override
-            public void mouseDragged(MouseEvent e) {
-                Point p2 = new Point(e.getX(), e.getY());
-
-                if (shiftMode) { // snap během drag pro náhled
-                    p2 = snapTo45Degrees(pPomocny, p2);
-                }
-
-                Line preview = new Line(pPomocny, p2, dottedMode);
-
-                raster.clear();
-                canvasRasterizer.rasterize(lineCanvas);
-
-                if (dottedMode) {
-                    dottedRasterizer.rasterize(preview);
-                } else {
-                    normalRasterizer.rasterize(preview);
-                }
-
-                panel.repaint();
-            }
-        };
-
-        keyAdapter = new KeyAdapter() {
-
-            @Override
-            public void keyPressed(KeyEvent e) {
-                if (e.getKeyCode() == KeyEvent.VK_CONTROL) {
-                    dottedMode = true;
-                }
-
-                if (e.getKeyCode() == KeyEvent.VK_SHIFT) {
-                    shiftMode = true; // držení shiftu
-                }
-
-                if (e.getKeyCode() == KeyEvent.VK_C) {
-                    lineCanvas.getLines().clear();
-                    raster.clear();
-                    panel.repaint();
-                }
-            }
-
-            @Override
-            public void keyReleased(KeyEvent e) {
-                if (e.getKeyCode() == KeyEvent.VK_CONTROL) {
-                    dottedMode = false;
-                }
-
-                if (e.getKeyCode() == KeyEvent.VK_SHIFT) {
-                    shiftMode = false;
-                }
-            }
-        };
+    public static void main(String[] args) {
+        SwingUtilities.invokeLater(() -> new App(800, 600));
     }
 }

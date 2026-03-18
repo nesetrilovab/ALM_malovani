@@ -1,29 +1,52 @@
 package rasterizers;
 
 import models.Line;
-import models.LineCanvas;
+import models.LineStyle;
+import java.awt.Color;
 
-public class CanvasRasterizer {
+//Hlavní rasterizer, který podle stylu čáry rozděluje práci na konkrétní subrasterizer
+public class CanvasRasterizer implements Rasterizer {
+    private final Rasterizer solidRasterizer;
+    private final Rasterizer dottedRasterizer;
+    private final Rasterizer dashedRasterizer;
 
-    private Rasterizer lineRasterizer;
-    private Rasterizer dottedLineRasterizer;
-
-    public CanvasRasterizer(Rasterizer lineRasterizer, Rasterizer dottedLineRasterizer) {
-        this.lineRasterizer = lineRasterizer;
-        this.dottedLineRasterizer = dottedLineRasterizer;
+    public CanvasRasterizer(Rasterizer solid, Rasterizer dotted, Rasterizer dashed) {
+        this.solidRasterizer = solid;
+        this.dottedRasterizer = dotted;
+        this.dashedRasterizer = dashed;
     }
 
-    public void rasterize(LineCanvas lineCanvas) {
-        if (lineCanvas == null) return;
-        for (Line line : lineCanvas.getLines()) {
-            if (line.isDotted()) {
-                dottedLineRasterizer.rasterize(line);
-            } else {
-                lineRasterizer.rasterize(line);
-            }
-        }
+    @Override
+    public void setColor(Color color) {
+        solidRasterizer.setColor(color);
+        dottedRasterizer.setColor(color);
+        dashedRasterizer.setColor(color);
+    }
+    //kreslí jednotlivý bod
+    @Override
+    public void drawPixel(int x, int y, Color color, int thickness) {
+        solidRasterizer.drawPixel(x, y, color, thickness);
     }
 
 
+    @Override
+    public void rasterize(Line line) {
+        //výběr stylu
+        Rasterizer selected = getRasterizerForStyle(line.getStyle());
 
+        //synchro barvy
+        selected.setColor(line.getColor());
+
+        selected.rasterize(line);
+    }
+
+    //Pomocná metoda která mapuje enum LineStyle
+    public Rasterizer getRasterizerForStyle(LineStyle style) {
+        if (style == null) return solidRasterizer;
+        return switch (style) {
+            case DOTTED -> dottedRasterizer;
+            case DASHED -> dashedRasterizer;
+            default -> solidRasterizer;
+        };
+    }
 }

@@ -3,9 +3,11 @@ package rasters;
 import java.awt.*;
 import java.awt.image.BufferedImage;
 
+//implementace rastru - drží obrazová data
+
 public class RasterBufferedImage implements Raster {
 
-    private final BufferedImage img;
+    private final BufferedImage img; // Objekt Javy, který v sobě drží pole pixelů
     private int color;
 
     public BufferedImage getImg() {
@@ -20,7 +22,7 @@ public class RasterBufferedImage implements Raster {
         graphics.drawImage(img, 0, 0, null);
     }
 
-    public Graphics getGraphics(){
+    public Graphics getGraphics() {
         return img.getGraphics();
     }
 
@@ -55,5 +57,4 @@ public class RasterBufferedImage implements Raster {
     public int getHeight() {
         return img.getHeight();
     }
-
 }
