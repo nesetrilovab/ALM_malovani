@@ -114,7 +114,12 @@ public class App {
         JButton fillBtn = new JButton("Fill");
         fillBtn.addActionListener(e -> { canvas.setMode(CanvasPanel.Mode.FILL); canvas.requestFocusInWindow(); });
         toolbar.add(fillBtn);
-
+        JButton undoBtn = new JButton("Undo");
+        undoBtn.addActionListener(e -> {
+            canvas.undo();
+            canvas.requestFocusInWindow();
+        });
+        toolbar.add(undoBtn);
         toolbar.add(Box.createHorizontalGlue()); // Zarovná Clear tlačítko vpravo
 
         //Vymazání celého plátna

@@ -56,6 +56,11 @@ public class CanvasController {
                     case KeyEvent.VK_O -> panel.setMode(CanvasPanel.Mode.ELLIPSE);
                     case KeyEvent.VK_C -> panel.clearCanvas();
                     case KeyEvent.VK_E -> panel.setMode(CanvasPanel.Mode.ERASE);
+                    case KeyEvent.VK_Z -> {
+                        if (e.isControlDown()) {
+                            panel.undo();
+                        }
+                    }
                 }
             }
 

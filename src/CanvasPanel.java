@@ -278,4 +278,13 @@ public class CanvasPanel extends JPanel {
                 a.getY() + (int) (len * Math.sin(Math.toRadians(angle)))
         );
     }
+    //krok zpět
+    public void undo() {
+        if (!shapes.isEmpty()) {
+            shapes.remove(shapes.size() - 1);
+            // Pokud jsme zrovna kreslili polygon, musíme vynulovat i náhled
+            currentShape = null;
+            redrawAll();
+        }
+    }
 }
